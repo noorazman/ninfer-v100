@@ -1,0 +1,25 @@
+[Unit]
+Description=NInfer Swift 1.5 Qwen3.8-27B Serving (Single GPU 2, Phase 1)
+After=network.target
+
+[Service]
+Type=simple
+User=noorazman
+WorkingDirectory=/home/noorazman/dsh/ninfer-v100-gguf
+Environment="CUDA_VISIBLE_DEVICES=2"
+Environment="PATH=/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/noorazman/dsh/ninfer-v100-gguf/build-phase1/bin/ninfer-serve \
+    --gguf-model /mnt/ssd/llm_models/Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
+    --host 0.0.0.0 --port 8000 \
+    --model-id Swift-1.5-Qwen3.8-27B \
+    --max-context 32768 \
+    --kv-dtype int8 \
+    --spec mtp --draft-tokens 3 \
+    --log-level info
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
