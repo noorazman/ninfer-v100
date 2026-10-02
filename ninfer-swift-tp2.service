@@ -9,7 +9,7 @@ WorkingDirectory=/home/noorazman/dsh/ninfer-v100-gguf
 Environment="LD_LIBRARY_PATH=/home/noorazman/dsh/ninfer-v100-gguf/third_party/nccl_v100/lib:/usr/local/cuda/lib64"
 Environment="PATH=/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=/home/noorazman/dsh/ninfer-v100-gguf/build-phase2/bin/ninfer-serve \
-    --gguf-model /mnt/ssd/llm_models/Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
+    /home/noorazman/dsh/ninfer-v100-gguf/out/converted/Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.ninfer \
     --tp 2 --tp-devices 3,4 \
     --host 0.0.0.0 --port 8000 \
     --model-id Swift-1.5-Qwen3.8-27B \
