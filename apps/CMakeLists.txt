@@ -7,6 +7,7 @@ target_include_directories(ninfer PRIVATE
   ${PROJECT_SOURCE_DIR}/third_party)
 target_link_libraries(ninfer PRIVATE
   ninfer_engine
+  ninfer_gguf
   ninfer_product_logging
   ninfer_product_prompt_input)
 
@@ -28,3 +29,10 @@ target_include_directories(ninfer-perplexity PRIVATE
   ${PROJECT_SOURCE_DIR}/third_party
   ${CMAKE_CURRENT_SOURCE_DIR}/perplexity)
 target_link_libraries(ninfer-perplexity PRIVATE ninfer_engine ninfer_product_logging)
+
+add_executable(ninfer-gguf-convert gguf_convert/main.cpp)
+target_include_directories(ninfer-gguf-convert PRIVATE
+  ${PROJECT_SOURCE_DIR}/include
+  ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_SOURCE_DIR}/third_party)
+target_link_libraries(ninfer-gguf-convert PRIVATE ninfer_gguf)

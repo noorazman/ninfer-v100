@@ -1,4 +1,5 @@
 #include "options.h"
+#include "gguf/converter.h"
 #include "product/logging/logging.h"
 #include "product/logging/pretty_format.h"
 #include "product/logging/startup_log.h"
@@ -265,6 +266,28 @@ int main(int argc, char** argv) {
         request.stop.token_ids                    = cli.stop_token_ids;
         request.stop.strings                      = cli.stop_strings;
         request.output.raw                        = cli.raw_output;
+
+        if (cli.is_gguf_model) {
+            std::filesystem::path converted = cli.artifact_path;
+            if (converted.empty()) {
+                std::filesystem::path cache_dir = "out/converted";
+                std::filesystem::create_directories(cache_dir);
+                converted = cache_dir / (cli.gguf_model_path.stem().string() + ".ninfer");
+            }
+            if (!std::filesystem::exists(converted)) {
+                logger->info("Converting GGUF model '{}' to NInfer artifact '{}'...",
+                             cli.gguf_model_path.string(), converted.string());
+                ninfer::gguf::ConvertOptions conv_opt;
+                conv_opt.input_gguf = cli.gguf_model_path;
+                conv_opt.output_ninfer = converted;
+                conv_opt.threads = 16;
+                conv_opt.progress_callback = [&](std::string_view msg, float prog) {
+                    logger->info("  [{:3d}%] {}", static_cast<int>(prog * 100.0f), msg);
+                };
+                ninfer::gguf::convert_gguf_to_ninfer(conv_opt);
+            }
+            cli.artifact_path = converted;
+        }
 
         ninfer::EngineOptions engine_options;
         engine_options.artifact_path  = cli.artifact_path;

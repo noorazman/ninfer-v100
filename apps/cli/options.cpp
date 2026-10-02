@@ -77,7 +77,7 @@ ReasoningEffort parse_reasoning_effort(std::string_view text) {
 
 std::string usage_text(const char* argv0) {
     return std::string("usage: ") + argv0 +
-           " <model.ninfer> (--prompt <text>|--messages <messages.json>)\n"
+           " (<model.ninfer> | --gguf-model <model.gguf>) (--prompt <text>|--messages <messages.json>)\n"
            "       [--max-context N] [--kv-capacity N|auto] [--prefill-chunk N] [--max-new N]\n"
            "       [--device N]\n"
            "       [--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec mtp|dflash|dflash2 --draft-tokens "
@@ -110,18 +110,27 @@ Options parse_options(int argc, char** argv) {
         options.help_requested = true;
         return options;
     }
-    if (argc < 2) { throw std::invalid_argument(".ninfer model path is required"); }
-    options.artifact_path     = argv[1];
+    if (argc < 2) { throw std::invalid_argument(".ninfer model path or --gguf-model is required"); }
+
+    int start_idx = 1;
+    if (argv[1][0] != '-') {
+        options.artifact_path = argv[1];
+        start_idx = 2;
+    }
+
     bool kv_capacity_explicit = false;
 
-    for (int i = 2; i < argc; ++i) {
+    for (int i = start_idx; i < argc; ++i) {
         const std::string_view arg(argv[i]);
         const auto value = [&](std::string_view flag) -> const char* {
             if (++i >= argc) { throw std::invalid_argument(std::string(flag) + " needs a value"); }
             return argv[i];
         };
 
-        if (arg == "--prompt") {
+        if (arg == "--gguf-model") {
+            options.gguf_model_path = value(arg);
+            options.is_gguf_model   = true;
+        } else if (arg == "--prompt") {
             options.prompt = value(arg);
         } else if (arg == "--messages") {
             options.messages_path = value(arg);
@@ -198,6 +207,10 @@ Options parse_options(int argc, char** argv) {
         } else {
             throw std::invalid_argument("unknown argument: " + std::string(arg));
         }
+    }
+
+    if (options.artifact_path.empty() && !options.is_gguf_model) {
+        throw std::invalid_argument(".ninfer model path or --gguf-model is required");
     }
 
     if (!kv_capacity_explicit) {

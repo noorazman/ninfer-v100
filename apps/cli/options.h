@@ -15,6 +15,8 @@ struct Options {
     bool help_requested = false;
 
     std::filesystem::path artifact_path;
+    std::filesystem::path gguf_model_path;
+    bool is_gguf_model = false;
     std::string prompt;
     std::filesystem::path messages_path;
 

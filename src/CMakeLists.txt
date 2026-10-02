@@ -46,6 +46,15 @@ add_library(ninfer_artifact STATIC
 ninfer_internal_includes(ninfer_artifact)
 target_link_libraries(ninfer_artifact PUBLIC ninfer_core)
 
+# GGUF parser and dequantization loader
+add_library(ninfer_gguf STATIC
+  gguf/gguf_parser.cpp
+  gguf/converter.cpp)
+ninfer_internal_includes(ninfer_gguf)
+target_include_directories(ninfer_gguf PUBLIC
+  ${PROJECT_SOURCE_DIR}/third_party/ggml_dequant)
+target_link_libraries(ninfer_gguf PUBLIC ninfer_ggml_dequant ninfer_artifact)
+
 # Warp-specialized SM120 NVFP4 kernels use setmaxnreg to transfer registers from producer
 # warpgroups to consumer warpgroups. Relocatable device code makes ptxas discard that contract, so
 # these self-contained kernels are intentionally compiled in a non-RDC archive and called through
@@ -439,6 +448,7 @@ add_subdirectory(targets/qwen3_6_35b_a3b)
 target_link_libraries(ninfer_engine
   PRIVATE
     ninfer_artifact
+    ninfer_gguf
     ninfer_core
     ninfer_ops
     ninfer_text

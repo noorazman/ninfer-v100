@@ -104,5 +104,12 @@ int main() {
                   (void)parse({"ninfer-cli", "model.ninfer", "--prompt", "hello", "--top-k", "21"});
               }),
               "CLI accepted top_k beyond the executable candidate domain");
+
+    const ninfer::cli::Options gguf_opt =
+        parse({"ninfer-cli", "--gguf-model", "test.gguf", "--prompt", "hello"});
+    failures += check(gguf_opt.is_gguf_model, "--gguf-model was not set");
+    failures += check(gguf_opt.gguf_model_path == "test.gguf", "--gguf-model path not preserved");
+    failures += check(help.find("--gguf-model") != std::string::npos, "CLI help omits --gguf-model");
+
     return failures == 0 ? 0 : 1;
 }

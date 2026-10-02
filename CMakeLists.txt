@@ -114,6 +114,8 @@ if(NINFER_BUILD_APPS OR BUILD_TESTING)
   add_subdirectory(third_party/spdlog)
 endif()
 
+add_subdirectory(third_party/ggml_dequant)
+
 # --- Subdirectories ----------------------------------------------------------
 add_subdirectory(src)
 if(NINFER_BUILD_APPS)
