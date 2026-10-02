@@ -104,13 +104,9 @@ void Binder::materialize_on_device(ObjectHandle handle) {
 }
 
 void Binder::retain_on_host(ObjectHandle handle) {
-    const auto* resource = std::get_if<ResourceDescriptor>(&descriptor(handle));
-    if (resource == nullptr) {
-        throw ArtifactError("tensor cannot be retained as a host resource");
-    }
     if (planned_[handle.index]) {
         throw ArtifactError("artifact object has more than one materialization placement: " +
-                            std::string(resource->name));
+                            std::string(object_name(descriptor(handle))));
     }
     materialization_.host_objects.push_back(HostMaterialization{handle});
     planned_[handle.index] = true;

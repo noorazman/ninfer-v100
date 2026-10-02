@@ -144,7 +144,11 @@ DeviceArena::DeviceArena(std::size_t capacity_bytes) {
     }
 
     void* ptr             = nullptr;
-    const cudaError_t err = cudaMalloc(&ptr, capacity_bytes);
+    cudaError_t err       = cudaMalloc(&ptr, capacity_bytes);
+    if (err != cudaSuccess) {
+        // Fall back to cudaMallocManaged to allow unified memory oversubscription across GPUs/host
+        err = cudaMallocManaged(&ptr, capacity_bytes);
+    }
     if (err != cudaSuccess) {
         throw std::runtime_error(cuda_error_message("cudaMalloc failed", err));
     }

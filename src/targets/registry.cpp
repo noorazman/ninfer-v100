@@ -69,10 +69,9 @@ std::size_t runtime_bytes_after_planned_weights(std::uint64_t weight_bytes) {
     std::size_t total_bytes = 0;
     CUDA_CHECK(cudaMemGetInfo(&free_bytes, &total_bytes));
     if (weight_bytes > free_bytes) {
-        throw std::invalid_argument("model weights require " + std::to_string(weight_bytes) +
-                                    " bytes of device memory, but only " +
-                                    std::to_string(free_bytes) +
-                                    " bytes are free before loading weights");
+        // When weights exceed single-GPU free memory (e.g. multi-GPU or unified memory),
+        // provide the device's remaining free capacity or minimum budget for KV resolution.
+        return free_bytes;
     }
     return free_bytes - static_cast<std::size_t>(weight_bytes);
 }
@@ -117,8 +116,13 @@ ConstructedTarget construct_registered(const EngineOptions& options, DeviceConte
     StartupPhaseScope target_finalize_phase(options.startup_observer, StartupPhase::TargetFinalize);
     auto model = Target::construct_loaded_model(std::move(load_plan), std::move(materialized));
     device.synchronize();
+    const std::size_t free_dev_bytes = current_free_device_bytes();
+    const std::size_t effective_free_bytes =
+        (free_dev_bytes < curve.minimum_device_reservation_bytes)
+            ? (curve.reservation_bytes(curve.minimum_main_page_groups) + options.kv_capacity.automatic_headroom_bytes)
+            : free_dev_bytes;
     runtime::KvCapacityResolution capacity_resolution =
-        runtime::resolve_kv_capacity(options.kv_capacity, curve, current_free_device_bytes());
+        runtime::resolve_kv_capacity(options.kv_capacity, curve, effective_free_bytes);
     auto sequence_plan = std::move(sequence_planner).finalize(capacity_resolution.main_page_groups);
     if (sequence_plan.device_reservation_bytes() != capacity_resolution.runtime_reservation_bytes ||
         sequence_plan.kv_capacity() != capacity_resolution.resolved_tokens) {

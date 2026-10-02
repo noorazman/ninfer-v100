@@ -493,7 +493,8 @@ ArtifactLoadPlan bind_artifact(artifact::Binder& binder, WeightsProfile weights_
 
     const NumericFormat vocabulary_format = endpoint_format(weights_profile);
     out.token_embedding =
-        bind_weight(binder, "text/token_embedding", vocabulary_format, {248320, 5120});
+        bind_weight(binder, "text/token_embedding", vocabulary_format, {248320, 5120},
+                    artifact::TensorPlacement::HostPinned);
     switch (weights_profile) {
     case WeightsProfile::Qwen36GroupwiseInt:
     case WeightsProfile::Qwen38GroupwiseInt:

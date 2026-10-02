@@ -12,6 +12,7 @@ namespace ninfer::artifact {
 
 enum class TensorPlacement : std::uint8_t {
     Device,
+    HostPinned,
     ValidateOnly,
 };
 

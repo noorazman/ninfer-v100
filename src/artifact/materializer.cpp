@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <stdexcept>
@@ -69,11 +70,29 @@ struct ReadSpan {
 
 } // namespace
 
-void* MaterializedArtifact::device_data(ObjectHandle handle) const {
-    if (handle.index >= objects_.size() || objects_[handle.index].device == nullptr) {
-        throw ArtifactError("object handle does not name a materialized tensor");
+MaterializedArtifact::~MaterializedArtifact() {
+    for (auto& obj : objects_) {
+        if (obj.host_pinned != nullptr) {
+            cudaFreeHost(obj.host_pinned);
+            obj.host_pinned = nullptr;
+        }
     }
-    return objects_[handle.index].device;
+}
+
+void* MaterializedArtifact::device_data(ObjectHandle handle) const {
+    if (handle.index >= objects_.size()) {
+        throw ArtifactError("object handle out of range");
+    }
+    if (objects_[handle.index].device != nullptr) {
+        return objects_[handle.index].device;
+    }
+    if (objects_[handle.index].host_pinned != nullptr) {
+        return objects_[handle.index].host_pinned;
+    }
+    if (!objects_[handle.index].resource.empty()) {
+        return const_cast<void*>(static_cast<const void*>(objects_[handle.index].resource.data()));
+    }
+    throw ArtifactError("object handle does not name a materialized tensor or resource");
 }
 
 std::span<const std::byte> MaterializedArtifact::resource_bytes(ObjectHandle handle) const {
@@ -120,12 +139,30 @@ MaterializedArtifact materialize(const Reader& reader, const MaterializationPlan
     out.stats_.resource_count        = plan.host_objects.size();
 
     for (const HostMaterialization& placement : plan.host_objects) {
-        auto& resource            = out.objects_.at(placement.object.index).resource;
-        const PayloadSpan payload = reader.payload(reader.objects().at(placement.object.index));
-        resource.assign(payload.data.begin(), payload.data.end());
-        out.stats_.retained_resource_bytes += resource.size();
-        out.stats_.file_bytes =
-            checked_add(out.stats_.file_bytes, resource.size(), "artifact read bytes overflow u64");
+        const auto& desc = reader.objects().at(placement.object.index);
+        const auto name = object_name(desc);
+        const PayloadSpan payload = reader.payload(desc);
+
+        if (std::holds_alternative<TensorDescriptor>(desc)) {
+            // Allocate page-locked (pinned) host memory mapped into GPU address space
+            void* pinned_ptr = nullptr;
+            cudaError_t err = cudaHostAlloc(&pinned_ptr, payload.data.size(), cudaHostAllocMapped);
+            if (err != cudaSuccess) {
+                throw ArtifactError("cudaHostAlloc failed for host pinned tensor: " + std::string(name));
+            }
+            std::memcpy(pinned_ptr, payload.data.data(), payload.data.size());
+            out.objects_.at(placement.object.index).host_pinned = pinned_ptr;
+            out.objects_.at(placement.object.index).host_pinned_bytes = payload.data.size();
+            out.stats_.retained_resource_bytes += payload.data.size();
+            out.stats_.file_bytes =
+                checked_add(out.stats_.file_bytes, payload.data.size(), "artifact read bytes overflow u64");
+        } else {
+            auto& resource = out.objects_.at(placement.object.index).resource;
+            resource.assign(payload.data.begin(), payload.data.end());
+            out.stats_.retained_resource_bytes += resource.size();
+            out.stats_.file_bytes =
+                checked_add(out.stats_.file_bytes, resource.size(), "artifact read bytes overflow u64");
+        }
     }
 
     std::vector<CopyRange> ranges;
@@ -133,7 +170,10 @@ MaterializedArtifact materialize(const Reader& reader, const MaterializationPlan
     std::uint64_t copied         = 0;
     std::uint64_t last_published = 0;
     for (const DeviceMaterialization& placement : plan.device_objects) {
-        const PayloadSpan payload = reader.payload(reader.objects().at(placement.object.index));
+        const auto& desc = reader.objects().at(placement.object.index);
+        const auto name = object_name(desc);
+        const PayloadSpan payload = reader.payload(desc);
+
         DeviceSpan storage =
             out.device_arena_->alloc_bytes(static_cast<std::size_t>(placement.bytes),
                                            static_cast<std::size_t>(placement.alignment));
@@ -143,6 +183,14 @@ MaterializedArtifact materialize(const Reader& reader, const MaterializationPlan
         if (actual_offset != placement.offset || payload.data.size() != placement.bytes) {
             throw ArtifactError("materialization plan does not match artifact payload");
         }
+
+        // If this tensor is token_embedding, advise CUDA to keep it in host memory
+        // so it does not consume physical VRAM while remaining addressable by kernels.
+        if (name == "text/token_embedding") {
+            cudaMemAdvise(storage.data, placement.bytes, cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId);
+            cudaMemAdvise(storage.data, placement.bytes, cudaMemAdviseSetAccessedBy, device.device);
+        }
+
         out.objects_.at(placement.object.index).device = storage.data;
         ranges.push_back(CopyRange{
             .source_begin = payload.absolute_offset,

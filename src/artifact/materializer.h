@@ -27,7 +27,7 @@ struct MaterializationStats {
 class MaterializedArtifact {
 public:
     MaterializedArtifact()                                           = default;
-    ~MaterializedArtifact()                                          = default;
+    ~MaterializedArtifact();
     MaterializedArtifact(MaterializedArtifact&&) noexcept            = default;
     MaterializedArtifact& operator=(MaterializedArtifact&&) noexcept = default;
     MaterializedArtifact(const MaterializedArtifact&)                = delete;
@@ -47,6 +47,8 @@ private:
 
     struct ObjectStorage {
         void* device = nullptr;
+        void* host_pinned = nullptr;
+        size_t host_pinned_bytes = 0;
         std::vector<std::byte> resource;
     };
 

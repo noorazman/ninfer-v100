@@ -129,6 +129,8 @@ void embed_gather_w8_launch(const Tensor& ids, const Weight& table, Tensor& out,
         return;
     }
 
+    if (T == 0) return;
+
     // Four signed codes share their exact group scale. Keep byte-addressed tables on the
     // scalar reader and preserve two-byte output alignment through the packed kernel's stores.
     if (d == 5120 && table.padded_shape[1] == 5120 &&

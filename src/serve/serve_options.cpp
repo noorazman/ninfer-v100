@@ -66,7 +66,7 @@ KvCapacityPolicy parse_kv_capacity(const char* text) {
 
 std::string serve_usage_text(const char* argv0) {
     return std::string("usage: ") + argv0 +
-           " <model.ninfer> [--host H] [--port N] [--api-key KEY] "
+           " (<model.ninfer> | --gguf-model <model.gguf>) [--tp N] [--tp-devices D0,D1...] [--host H] [--port N] [--api-key KEY] "
            "[--model-id ID] [--max-context N] [--kv-capacity N|auto] [--max-concurrency N] "
            "[--max-pending-requests N] [--pending-timeout-ms N] "
            "[--prefill-chunk N] [--log-stats-interval-ms N] [--device N] "
@@ -135,15 +135,35 @@ ServeOptions parse_serve_options(int argc, char** argv) {
         options.help_requested = true;
         return options;
     }
-    if (argc < 2) { throw std::invalid_argument("artifact path is required"); }
-    options.artifact_path = argv[1];
-    for (int i = 2; i < argc; ++i) {
+    if (argc < 2) { throw std::invalid_argument("artifact path or --gguf-model is required"); }
+    int start_idx = 1;
+    if (argv[1][0] != '-') {
+        options.artifact_path = argv[1];
+        start_idx = 2;
+    }
+    for (int i = start_idx; i < argc; ++i) {
         const std::string arg    = argv[i];
         const auto require_value = [&](const char* flag) -> const char* {
             if (++i >= argc) { throw std::invalid_argument(std::string(flag) + " needs a value"); }
             return argv[i];
         };
-        if (arg == "--host") {
+        if (arg == "--gguf-model") {
+            options.gguf_model_path = require_value("--gguf-model");
+            options.is_gguf_model   = true;
+        } else if (arg == "--tp") {
+            options.tp_size = parse_nonnegative_int(require_value("--tp"), "tp");
+        } else if (arg == "--tp-devices") {
+            std::string devs = require_value("--tp-devices");
+            options.tp_devices.clear();
+            size_t start = 0;
+            while (start < devs.size()) {
+                size_t comma = devs.find(',', start);
+                if (comma == std::string::npos) comma = devs.size();
+                std::string part = devs.substr(start, comma - start);
+                if (!part.empty()) options.tp_devices.push_back(std::stoi(part));
+                start = comma + 1;
+            }
+        } else if (arg == "--host") {
             options.host = require_value("--host");
         } else if (arg == "--port") {
             options.port = parse_nonnegative_int(require_value("--port"), "port");
@@ -320,6 +340,9 @@ ServeOptions parse_serve_options(int argc, char** argv) {
         } else {
             throw std::invalid_argument("unknown argument: " + arg);
         }
+    }
+    if (options.artifact_path.empty() && !options.is_gguf_model) {
+        throw std::invalid_argument("artifact path or --gguf-model is required");
     }
     if (!kv_capacity_explicit) {
         options.kv_capacity = KvCapacityPolicy::explicit_capacity(options.max_context);

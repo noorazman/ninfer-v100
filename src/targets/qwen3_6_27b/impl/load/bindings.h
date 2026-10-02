@@ -239,6 +239,7 @@ public:
     LoadedModelData& operator=(LoadedModelData&&)      = delete;
 
     artifact::MaterializedArtifact backing;
+    std::vector<std::byte> host_token_embedding_;
     qwen3_6::FrontendResources frontend;
     RuntimeModelView runtime;
 };
