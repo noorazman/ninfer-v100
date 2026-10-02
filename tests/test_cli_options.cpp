@@ -106,10 +106,13 @@ int main() {
               "CLI accepted top_k beyond the executable candidate domain");
 
     const ninfer::cli::Options gguf_opt =
-        parse({"ninfer-cli", "--gguf-model", "test.gguf", "--prompt", "hello"});
+        parse({"ninfer-cli", "--gguf-model", "test.gguf", "--prompt", "hello", "--tp", "2", "--tp-devices", "3,4"});
     failures += check(gguf_opt.is_gguf_model, "--gguf-model was not set");
     failures += check(gguf_opt.gguf_model_path == "test.gguf", "--gguf-model path not preserved");
+    failures += check(gguf_opt.tp_size == 2, "--tp size was not parsed");
+    failures += check(gguf_opt.tp_devices.size() == 2 && gguf_opt.tp_devices[0] == 3 && gguf_opt.tp_devices[1] == 4, "--tp-devices was not parsed");
     failures += check(help.find("--gguf-model") != std::string::npos, "CLI help omits --gguf-model");
+    failures += check(help.find("--tp") != std::string::npos, "CLI help omits --tp");
 
     return failures == 0 ? 0 : 1;
 }

@@ -37,6 +37,10 @@ struct Options {
     std::optional<std::uint32_t> thinking_budget;
     std::optional<ReasoningEffort> reasoning_effort;
 
+    // Tensor Parallelism options
+    int tp_size = 1;
+    std::vector<int> tp_devices = {0};
+
     std::vector<TokenId> stop_token_ids;
     std::vector<StopString> stop_strings;
 

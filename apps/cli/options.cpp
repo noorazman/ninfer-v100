@@ -79,7 +79,7 @@ std::string usage_text(const char* argv0) {
     return std::string("usage: ") + argv0 +
            " (<model.ninfer> | --gguf-model <model.gguf>) (--prompt <text>|--messages <messages.json>)\n"
            "       [--max-context N] [--kv-capacity N|auto] [--prefill-chunk N] [--max-new N]\n"
-           "       [--device N]\n"
+           "       [--device N] [--tp N] [--tp-devices D0,D1...]\n"
            "       [--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec mtp|dflash|dflash2 --draft-tokens "
            "N]\n"
            "       [--lm-head-draft]\n"
@@ -130,6 +130,19 @@ Options parse_options(int argc, char** argv) {
         if (arg == "--gguf-model") {
             options.gguf_model_path = value(arg);
             options.is_gguf_model   = true;
+        } else if (arg == "--tp") {
+            options.tp_size = parse_device(value(arg));
+        } else if (arg == "--tp-devices") {
+            std::string devs = value(arg);
+            options.tp_devices.clear();
+            size_t start = 0;
+            while (start < devs.size()) {
+                size_t comma = devs.find(',', start);
+                if (comma == std::string::npos) comma = devs.size();
+                std::string part = devs.substr(start, comma - start);
+                if (!part.empty()) options.tp_devices.push_back(std::stoi(part));
+                start = comma + 1;
+            }
         } else if (arg == "--prompt") {
             options.prompt = value(arg);
         } else if (arg == "--messages") {

@@ -64,6 +64,18 @@ ninfer_add_test(ninfer_gguf_parser_test
 ninfer_add_test(ninfer_gguf_loader_test
   SOURCES test_gguf_loader.cpp
   LIBRARIES ninfer_gguf ninfer_ggml_dequant ninfer_ops ninfer_core)
+ninfer_add_test(ninfer_tp_nccl_test
+  SOURCES test_tp_nccl.cpp
+  LIBRARIES ninfer_dist ninfer_core)
+set_target_properties(ninfer_tp_nccl_test PROPERTIES
+  BUILD_RPATH "${PROJECT_SOURCE_DIR}/third_party/nccl_v100/lib"
+  INSTALL_RPATH "${PROJECT_SOURCE_DIR}/third_party/nccl_v100/lib")
+ninfer_add_test(ninfer_tp_benchmark_test
+  SOURCES test_tp_benchmark.cpp
+  LIBRARIES ninfer_dist ninfer_core ninfer_gguf ninfer_ggml_dequant ninfer_ops)
+set_target_properties(ninfer_tp_benchmark_test PROPERTIES
+  BUILD_RPATH "${PROJECT_SOURCE_DIR}/third_party/nccl_v100/lib"
+  INSTALL_RPATH "${PROJECT_SOURCE_DIR}/third_party/nccl_v100/lib")
 ninfer_add_test(ninfer_media_decode_test
   SOURCES test_media_decode.cpp
   LIBRARIES ninfer_media_decode)

@@ -55,6 +55,24 @@ target_include_directories(ninfer_gguf PUBLIC
   ${PROJECT_SOURCE_DIR}/third_party/ggml_dequant)
 target_link_libraries(ninfer_gguf PUBLIC ninfer_ggml_dequant ninfer_artifact)
 
+# Multi-GPU Tensor Parallelism support
+find_path(NCCL_INCLUDE_DIR nccl.h PATHS ${PROJECT_SOURCE_DIR}/third_party/nccl_v100/include /usr/include NO_DEFAULT_PATH)
+find_library(NCCL_LIBRARY NAMES nccl PATHS ${PROJECT_SOURCE_DIR}/third_party/nccl_v100/lib /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
+
+add_library(ninfer_dist STATIC
+  dist/tp_context.cpp)
+ninfer_internal_includes(ninfer_dist)
+target_include_directories(ninfer_dist PUBLIC
+  ${PROJECT_SOURCE_DIR}/include
+  ${NCCL_INCLUDE_DIR})
+target_link_libraries(ninfer_dist PUBLIC
+  ninfer_core
+  ${NCCL_LIBRARY}
+  CUDA::cudart)
+set_target_properties(ninfer_dist PROPERTIES
+  BUILD_RPATH "${PROJECT_SOURCE_DIR}/third_party/nccl_v100/lib"
+  INSTALL_RPATH "${PROJECT_SOURCE_DIR}/third_party/nccl_v100/lib")
+
 # Warp-specialized SM120 NVFP4 kernels use setmaxnreg to transfer registers from producer
 # warpgroups to consumer warpgroups. Relocatable device code makes ptxas discard that contract, so
 # these self-contained kernels are intentionally compiled in a non-RDC archive and called through
@@ -449,6 +467,7 @@ target_link_libraries(ninfer_engine
   PRIVATE
     ninfer_artifact
     ninfer_gguf
+    ninfer_dist
     ninfer_core
     ninfer_ops
     ninfer_text
